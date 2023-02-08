@@ -11,7 +11,7 @@
 using namespace std;
 
 const int MAX_RESULT_DOCUMENT_COUNT = 5;
-const int DELTA = 1e-6;
+const double DELTA = 1e-6;
 
 string ReadLine() {
     string s;
@@ -85,7 +85,7 @@ public:
     explicit SearchServer(const StringContainer& stop_words)
         : stop_words_(MakeUniqueNonEmptyStrings(stop_words)) {
         for (const string& word : stop_words) {
-            if (!IsValidWord(word)) throw invalid_argument("Forbidden symbols"); 
+            if (!IsValidWord(word)) throw invalid_argument("Forbidden symbols");
         }
     }
 
@@ -106,7 +106,7 @@ public:
             if (!IsValidWord(word)) throw invalid_argument("Forbidden symbols");
             word_to_document_freqs_[word][document_id] += inv_word_count;
         }
-        documents_.emplace(document_id, DocumentData{ ComputeAverageRating(ratings), status });
+        documents_.emplace(document_id, DocumentData{ ComputeAverageRating(ratings), status, GetDocumentCount() - 1 });
     }
 
 
@@ -146,8 +146,12 @@ public:
     }
 
     int GetDocumentId(int index) const {
-        if (index > documents_.size()) throw out_of_range("Index out of range");
-        else return index;
+        if (index > documents_.size() || index < 0) throw out_of_range("Index out of range");
+        for (const auto&[id, document] : documents_) {
+            if (document.index == index) return id;
+        }
+        throw out_of_range("Document does not exist");
+        return -1;
     }
 
     tuple<vector<string>, DocumentStatus> MatchDocument(const string& raw_query, int document_id) const {
@@ -178,7 +182,7 @@ private:
     struct DocumentData {
         int rating;
         DocumentStatus status;
-        //int index;
+        int index;
     };
     const set<string> stop_words_;
     map<string, map<int, double>> word_to_document_freqs_;
@@ -307,5 +311,5 @@ void PrintDocument(const Document& document) {
         << "rating = "s << document.rating << " }"s << endl;
 }
 int main() {
-    
+
 }
