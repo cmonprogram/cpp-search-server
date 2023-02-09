@@ -81,6 +81,8 @@ enum class DocumentStatus {
 
 class SearchServer {
 public:
+    SearchServer() = default;
+
     template <typename StringContainer>
     explicit SearchServer(const StringContainer& stop_words)
         : stop_words_(MakeUniqueNonEmptyStrings(stop_words)) {
@@ -106,7 +108,8 @@ public:
             if (!IsValidWord(word)) throw invalid_argument("Forbidden symbols");
             word_to_document_freqs_[word][document_id] += inv_word_count;
         }
-        documents_.emplace(document_id, DocumentData{ ComputeAverageRating(ratings), status, GetDocumentCount() - 1 });
+        documents_.emplace(document_id, DocumentData{ ComputeAverageRating(ratings), status});
+        documents_index_.push_back(document_id);
     }
 
 
@@ -146,12 +149,7 @@ public:
     }
 
     int GetDocumentId(int index) const {
-        if (index > documents_.size() || index < 0) throw out_of_range("Index out of range");
-        for (const auto&[id, document] : documents_) {
-            if (document.index == index) return id;
-        }
-        throw out_of_range("Document does not exist");
-        return -1;
+        return documents_index_.at(index);
     }
 
     tuple<vector<string>, DocumentStatus> MatchDocument(const string& raw_query, int document_id) const {
@@ -182,11 +180,11 @@ private:
     struct DocumentData {
         int rating;
         DocumentStatus status;
-        int index;
     };
     const set<string> stop_words_;
     map<string, map<int, double>> word_to_document_freqs_;
     map<int, DocumentData> documents_;
+    vector<int> documents_index_;
 
     bool IsStopWord(const string& word) const {
         return stop_words_.count(word) > 0;
@@ -311,5 +309,11 @@ void PrintDocument(const Document& document) {
         << "rating = "s << document.rating << " }"s << endl;
 }
 int main() {
-
+    SearchServer s;
+    try {
+        s.GetDocumentId(-1);
+    }
+    catch (out_of_range e) {
+        cout << e.what();
+    }
 }
