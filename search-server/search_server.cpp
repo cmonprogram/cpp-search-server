@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <algorithm>
 
 #include "search_server.h"
 #include "string_processing.h"
@@ -20,11 +21,13 @@ void SearchServer::AddDocument(int document_id, const std::string& document, Doc
 
     const std::vector<std::string> words = SplitIntoWordsNoStop(document);
     const double inv_word_count = 1.0 / words.size();
+    DocumentData document_data = { ComputeAverageRating(ratings), status, {}};
     for (const std::string& word : words) {
         if (!IsValidWord(word)) throw std::invalid_argument("Forbidden symbols");
         word_to_document_freqs_[word][document_id] += inv_word_count;
+        document_data.freqs[word] += inv_word_count;
     }
-    documents_.emplace(document_id, DocumentData{ ComputeAverageRating(ratings), status });
+    documents_.emplace(document_id, document_data);
     documents_index_.push_back(document_id);
 }
 
@@ -41,14 +44,25 @@ std::vector<Document> SearchServer::FindTopDocuments(const std::string& raw_quer
     return FindTopDocuments(raw_query, DocumentStatus::ACTUAL);
 }
 
-
+const std::map<std::string, double>& SearchServer::GetWordFrequencies(int document_id) const {
+    if (!DocumeentExist(document_id)) return *new std::map<std::string, double>;
+    return documents_.at(document_id).freqs;
+}
 
 int SearchServer::GetDocumentCount() const {
     return documents_.size();
 }
 
-int SearchServer::GetDocumentId(int index) const {
-    return documents_index_.at(index);
+bool SearchServer::DocumeentExist(int document_id) const{
+    return std::binary_search(documents_index_.begin(), documents_index_.end(), document_id);
+}
+
+std::vector<int>::const_iterator SearchServer::begin() {
+    return documents_index_.begin();
+}
+
+std::vector<int>::const_iterator SearchServer::end() {
+    return documents_index_.end();
 }
 
 std::tuple<std::vector<std::string>, DocumentStatus> SearchServer::MatchDocument(const std::string& raw_query, int document_id) const {
@@ -74,6 +88,16 @@ std::tuple<std::vector<std::string>, DocumentStatus> SearchServer::MatchDocument
     return std::tuple{ matched_words, documents_.at(document_id).status };
 }
 
+void SearchServer::RemoveDocument(int document_id) {
+    if (!DocumeentExist(document_id)) return;
+    for (auto& [word_, freqs_]  : word_to_document_freqs_) {
+        //for (auto it = freqs_.begin(); it != freqs_.end(); ++it) {}
+        freqs_.erase(document_id);
+        //word_to_document_freqs_[word_] = freqs_;
+    }
+    documents_.erase(document_id);
+    documents_index_.erase(std::remove(documents_index_.begin(), documents_index_.end(), document_id));
+}
 
 bool SearchServer::IsStopWord(const std::string& word) const {
     return stop_words_.count(word) > 0;
