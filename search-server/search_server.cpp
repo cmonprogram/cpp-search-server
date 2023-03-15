@@ -28,7 +28,7 @@ void SearchServer::AddDocument(int document_id, const std::string& document, Doc
         document_data.freqs[word] += inv_word_count;
     }
     documents_.emplace(document_id, document_data);
-    documents_index_.push_back(document_id);
+    documents_index_.insert(document_id);
 }
 
 
@@ -45,7 +45,8 @@ std::vector<Document> SearchServer::FindTopDocuments(const std::string& raw_quer
 }
 
 const std::map<std::string, double>& SearchServer::GetWordFrequencies(int document_id) const {
-    if (!DocumeentExist(document_id)) return *new std::map<std::string, double>;
+    const static std::map<std::string, double> static_map;
+    if (!DocumeentExist(document_id)) return static_map;
     return documents_.at(document_id).freqs;
 }
 
@@ -57,11 +58,11 @@ bool SearchServer::DocumeentExist(int document_id) const{
     return std::binary_search(documents_index_.begin(), documents_index_.end(), document_id);
 }
 
-std::vector<int>::const_iterator SearchServer::begin() {
+std::set<int>::const_iterator SearchServer::begin() {
     return documents_index_.begin();
 }
 
-std::vector<int>::const_iterator SearchServer::end() {
+std::set<int>::const_iterator SearchServer::end() {
     return documents_index_.end();
 }
 
@@ -96,7 +97,7 @@ void SearchServer::RemoveDocument(int document_id) {
         //word_to_document_freqs_[word_] = freqs_;
     }
     documents_.erase(document_id);
-    documents_index_.erase(std::remove(documents_index_.begin(), documents_index_.end(), document_id));
+    documents_index_.erase(document_id);
 }
 
 bool SearchServer::IsStopWord(const std::string& word) const {
@@ -123,7 +124,7 @@ int SearchServer::ComputeAverageRating(const std::vector<int>& ratings) {
         rating_sum += rating;
     }
     */
-    int rating_sum = std::accumulate(ratings.begin(), ratings.end(),0);
+    int rating_sum = std::accumulate(ratings.begin(), ratings.end(), 0);
     return rating_sum / static_cast<int>(ratings.size());
 }
 
