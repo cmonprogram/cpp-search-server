@@ -6,11 +6,11 @@
 #include "remove_duplicates.h"
 
 void RemoveDuplicates(SearchServer& search_server) {
-    std::set<std::set<std::string>> unique;
+    std::set<std::set<std::string_view>> unique;
     std::vector<int> remove_list;
     for (const int document_id : search_server) {
-        const std::map<std::string, double> freqs = search_server.GetWordFrequencies(document_id);
-        std::set<std::string> words;
+        const std::map<std::string_view, double> freqs = search_server.GetWordFrequencies(document_id);
+        std::set<std::string_view> words;
         for (const auto& [key, value] : freqs) {
             words.insert(key);
         }
