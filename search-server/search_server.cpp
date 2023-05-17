@@ -14,8 +14,8 @@
 
 
 SearchServer::SearchServer() = default;
-SearchServer::SearchServer(const std::string& stop_words_text) : SearchServer(SplitIntoWords(stop_words_text)) {}
-SearchServer::SearchServer(std::string_view stop_words_text) : SearchServer(SplitIntoWords(std::string(stop_words_text))) {}//SplitIntoWordsCache
+SearchServer::SearchServer(const std::string& stop_words_text) : SearchServer(SplitIntoWordsView(stop_words_text)) {}
+SearchServer::SearchServer(std::string_view stop_words_text) : SearchServer(SplitIntoWordsView(stop_words_text)) {}//SplitIntoWordsCache
 
 void SearchServer::AddDocument(int document_id, std::string_view document, DocumentStatus status, const std::vector<int>& ratings) {
 
@@ -25,7 +25,7 @@ void SearchServer::AddDocument(int document_id, std::string_view document, Docum
 
     const std::vector<std::string_view> words = SplitIntoWordsNoStop(document);
     const double inv_word_count = 1.0 / words.size();
-    DocumentData document_data = { ComputeAverageRating(ratings), status, {}};
+    DocumentData document_data = { ComputeAverageRating(ratings), status, {} };
     for (std::string_view word : words) {
         if (!IsValidWord(word)) throw std::invalid_argument("Forbidden symbols");
         word_to_document_freqs_[word][document_id] += inv_word_count;
@@ -52,9 +52,7 @@ std::vector<Document> SearchServer::FindTopDocuments(std::execution::sequenced_p
     return FindTopDocuments(raw_query, status);
 }
 
-std::vector<Document> SearchServer::FindTopDocuments(std::execution::sequenced_policy policy, std::string_view raw_query) const {
-    return FindTopDocuments(raw_query);
-}
+
 
 std::vector<Document> SearchServer::FindTopDocuments(std::execution::parallel_policy policy, std::string_view raw_query, DocumentStatus status) const
 {
@@ -65,10 +63,7 @@ std::vector<Document> SearchServer::FindTopDocuments(std::execution::parallel_po
         });
 }
 
-std::vector<Document> SearchServer::FindTopDocuments(std::execution::parallel_policy policy, std::string_view raw_query) const
-{
-    return FindTopDocuments(std::execution::par, raw_query, DocumentStatus::ACTUAL);
-}
+
 
 const std::map<std::string_view, double>& SearchServer::GetWordFrequencies(int document_id) const {
     const static std::map<std::string_view, double> static_map;
@@ -274,34 +269,6 @@ SearchServer::Query SearchServer::ParseQueryWithDuplicates(std::string_view text
     return query;
 }
 
-SearchServer::Query SearchServer::ParseQueryWithDuplicates(std::execution::parallel_policy policy, std::string_view text) const {
-    Query query;
-    auto words = SplitIntoWordsView(text);
-    //query.minus_words.reserve(words.size());
-    //query.plus_words.reserve(words.size());
-    std::mutex m1;
-    std::mutex m2;
-    
-    std::for_each(
-        std::execution::par_unseq,
-        words.begin(), words.end(),
-        [&](std::string_view word) {
-            const QueryWord query_word = ParseQueryWord(word);
-            if (!query_word.is_stop) {
-                if (query_word.is_minus) {
-                    std::lock_guard<std::mutex> guard(m1);
-                    query.minus_words.push_back(query_word.data);
-                }
-                else {
-                    std::lock_guard<std::mutex> guard(m2);
-                    query.plus_words.push_back(query_word.data);
-                }
-            }
-        }
-    );
-    return query;
-}
-
 SearchServer::Query SearchServer::ParseQuery(std::string_view text) const {
 
     Query result = ParseQueryWithDuplicates(text);
@@ -317,20 +284,6 @@ SearchServer::Query SearchServer::ParseQuery(std::string_view text) const {
     return result;
 }
 
-SearchServer::Query SearchServer::ParseQuery(std::execution::parallel_policy policy, std::string_view text) const {
-
-    Query result = ParseQueryWithDuplicates(std::execution::par, text);
-
-    std::sort(std::execution::par, result.minus_words.begin(), result.minus_words.end());
-    auto new_end_minus = std::unique(std::execution::par_unseq, result.minus_words.begin(), result.minus_words.end());
-    result.minus_words.erase(new_end_minus, result.minus_words.end());
-
-    std::sort(std::execution::par, result.plus_words.begin(), result.plus_words.end());
-    auto new_end_plus = std::unique(std::execution::par_unseq, result.plus_words.begin(), result.plus_words.end());
-    result.plus_words.erase(new_end_plus, result.plus_words.end());
-
-    return result;
-}
 
 // Existence required
 double SearchServer::ComputeWordInverseDocumentFreq(std::string_view word) const {

@@ -36,12 +36,18 @@ public:
     template <typename DocumentPredicate>
     std::vector<Document> FindTopDocuments(std::execution::sequenced_policy policy, std::string_view raw_query, DocumentPredicate document_predicate) const;
     std::vector<Document> FindTopDocuments(std::execution::sequenced_policy policy, std::string_view raw_query, DocumentStatus status) const;
-    std::vector<Document> FindTopDocuments(std::execution::sequenced_policy policy, std::string_view raw_query) const;
+    
 
     template <typename DocumentPredicate>
     std::vector<Document> FindTopDocuments(std::execution::parallel_policy policy, std::string_view raw_query, DocumentPredicate document_predicate) const;
     std::vector<Document> FindTopDocuments(std::execution::parallel_policy policy, std::string_view raw_query, DocumentStatus status) const;
-    std::vector<Document> FindTopDocuments(std::execution::parallel_policy policy, std::string_view raw_query) const;
+
+    template <typename ExecutionPolicy>
+    std::vector<Document> FindTopDocuments(ExecutionPolicy policy, std::string_view raw_query) const
+    {
+        return FindTopDocuments(policy, raw_query, DocumentStatus::ACTUAL);
+    }
+
 
     const std::map<std::string_view, double>& GetWordFrequencies(int document_id) const;
     int GetDocumentCount() const;
@@ -62,7 +68,8 @@ private:
 
     struct DocumentData {
         int rating;
-        DocumentStatus status;
+        DocumentStatus status; 
+        //„астоты слов в документе, позвол€ет выполнить поиск по документам, а не по словам. ’ранение текста документа не требуетс€
         std::map<std::string_view, double> freqs;
     };
     
@@ -91,21 +98,21 @@ private:
     };
 
     Query ParseQuery(std::string_view text) const;
-    SearchServer::Query ParseQuery(std::execution::parallel_policy policy, std::string_view text) const;
     Query ParseQueryWithDuplicates(std::string_view text) const;
-    SearchServer::Query ParseQueryWithDuplicates(std::execution::parallel_policy policy, std::string_view text) const;
     // Existence required
     double ComputeWordInverseDocumentFreq(std::string_view word) const;
     template <typename DocumentPredicate>
     std::vector<Document> FindAllDocuments(const Query& query, DocumentPredicate document_predicate) const;
     template<typename DocumentPredicate>
     std::vector<Document> FindAllDocuments(std::execution::parallel_policy policy, const Query& query, DocumentPredicate document_predicate) const;
+    template<typename DocumentPredicate>
+    std::vector<Document> FindAllDocuments(std::execution::sequenced_policy policy, const Query& query, DocumentPredicate document_predicate) const;
 };
 
 template <typename StringContainer>
 SearchServer::SearchServer(const StringContainer& stop_words)
     : stop_words_(MakeUniqueNonEmptyStrings(stop_words, string_database)) {
-    for (const std::string& word : stop_words) {
+    for (std::string_view word : stop_words) {
         if (!IsValidWord(word)) throw std::invalid_argument("Forbidden symbols");
     }
 }
@@ -114,7 +121,7 @@ SearchServer::SearchServer(const StringContainer& stop_words)
 template <typename DocumentPredicate>
 std::vector<Document> SearchServer::FindTopDocuments(std::execution::parallel_policy policy, std::string_view raw_query, DocumentPredicate document_predicate) const {
 
-    Query query = ParseQuery(std::execution::par,raw_query);
+    Query query = ParseQuery(raw_query);
     std::vector<Document> matched_documents = FindAllDocuments(std::execution::par, query, document_predicate);
 
     std::sort(std::execution::par_unseq,matched_documents.begin(), matched_documents.end(),
@@ -130,11 +137,6 @@ std::vector<Document> SearchServer::FindTopDocuments(std::execution::parallel_po
         matched_documents.resize(MAX_RESULT_DOCUMENT_COUNT);
     }
     return matched_documents;
-
-    /*Ќачните с обучени€ всех версий методов FindTopDocuments и FindAllDocuments приЄму аргументов execution::seq и execution::par.
-    ѕопрофилируйте и определите, где узкое место: в сортировке документов или в FindAllDocuments в циклах по плюс- и минус-словам?
-    ¬ам пригодитс€ ConcurrentMap и, возможно, ConcurrentSet.
-    */
 }
 
 template <typename DocumentPredicate>
@@ -161,6 +163,7 @@ std::vector<Document> SearchServer::FindTopDocuments(std::string_view raw_query,
     }
     return matched_documents;
 }
+
 template <typename DocumentPredicate>
 std::vector<Document> SearchServer::FindAllDocuments(const Query& query,
     DocumentPredicate document_predicate) const {
@@ -241,4 +244,9 @@ std::vector<Document> SearchServer::FindAllDocuments(
             { document_id, relevance, documents_.at(document_id).rating });
     }
     return matched_documents;
+}
+
+template<typename DocumentPredicate>
+std::vector<Document> SearchServer::FindAllDocuments(std::execution::sequenced_policy policy, const Query& query, DocumentPredicate document_predicate) const {
+    return FindAllDocuments(query, document_predicate);
 }
