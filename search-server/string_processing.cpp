@@ -1,12 +1,12 @@
 #include <string_view>
 #include "string_processing.h"
-std::vector<std::string_view> SplitIntoWordsCache(std::string_view text, StringCache& database) {
+std::vector<std::string_view> SplitIntoWordsCache(std::string_view text, std::set<std::string>& database) {
     std::vector<std::string_view> words;
     std::string word;
     for (const char c : text) {
         if (c == ' ') {
             if (!word.empty()) {
-                words.push_back(database.get(word));
+                words.push_back(*(database.insert(std::string(word)).first));
                 word.clear();
             }
         }
@@ -15,7 +15,7 @@ std::vector<std::string_view> SplitIntoWordsCache(std::string_view text, StringC
         }
     }
     if (!word.empty()) {
-        words.push_back(database.get(word));
+        words.push_back(*(database.insert(std::string(word)).first));
     }
 
     return words;
