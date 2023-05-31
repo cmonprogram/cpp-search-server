@@ -23,15 +23,16 @@ void SearchServer::AddDocument(int document_id, std::string_view document, Docum
     if (document_id < 0) throw std::invalid_argument("ID less than zero");
     if (documents_.count(document_id) > 0) throw std::invalid_argument("ID is not exist");
 
-    const std::vector<std::string_view> words = SplitIntoWordsNoStop(document);
+    DocumentData document_data = { ComputeAverageRating(ratings), status, std::string(document) };
+    auto document_data_iter = documents_.emplace(document_id, document_data);
+    const std::vector<std::string_view> words = SplitIntoWordsNoStop((*document_data_iter.first).second.document);
     const double inv_word_count = 1.0 / words.size();
-    DocumentData document_data = { ComputeAverageRating(ratings), status};
     for (std::string_view word : words) {
         if (!IsValidWord(word)) throw std::invalid_argument("Forbidden symbols");
         word_to_document_freqs_[word][document_id] += inv_word_count;
         document_to_word_freqs_[document_id][word] += inv_word_count;
     }
-    documents_.emplace(document_id, document_data);
+    
     documents_index_.insert(document_id);
 }
 
@@ -190,7 +191,7 @@ bool SearchServer::IsStopWord(std::string_view word) const {
 
 std::vector<std::string_view> SearchServer::SplitIntoWordsNoStop(std::string_view text) {
     std::vector<std::string_view> words;
-    for (std::string_view word : SplitIntoWordsCache(text,string_data_)) {
+    for (std::string_view word : SplitIntoWordsView(text)) {
         if (!IsStopWord(word)) {
             words.push_back(word);
         }

@@ -2,7 +2,6 @@
 #include <string>
 #include <vector>
 #include <set>
-std::vector<std::string_view> SplitIntoWordsCache(std::string_view text, std::set<std::string>& database);
 std::vector<std::string_view> SplitIntoWordsView(std::string_view text);
 
 template <typename StringContainer>

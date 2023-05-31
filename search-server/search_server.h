@@ -58,11 +58,10 @@ public:
     void RemoveDocument(std::execution::parallel_policy policy, int document_id);
 
 private:
-    std::set<std::string> string_data_;
-
     struct DocumentData {
         int rating;
         DocumentStatus status;
+        std::string document;
     };
     
     const std::set<std::string> stop_words_;
